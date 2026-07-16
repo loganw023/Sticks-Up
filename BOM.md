@@ -1,0 +1,13 @@
+- 9G servo motor
+- PLA plastic
+- RAMPS 1.4 shield
+- Arduino MEGA
+- 1/2 Size Breadboard
+- MG996R Servo Motor
+- NEMA 17 Stepper Motor
+- 3mm HTD pulley + belt
+- Drawer slide
+- CherryMX key switches
+- Slide potentiometer
+- 9V battery
+- USB PB Negotiation Board
