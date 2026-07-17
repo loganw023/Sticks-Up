@@ -4,25 +4,36 @@
 
 
 // =====================================================
-// BUTTONS
+// PLAYER 1 BUTTONS
 // =====================================================
 
-#define FORWARD_BUTTON 17
-#define BACK_BUTTON    23
-#define ATTACK_BUTTON  16
-
-
-
-// =====================================================
-// POTENTIOMETER
-// =====================================================
-
-#define PLAYER_POT A3
+#define P1_FORWARD_BUTTON 17
+#define P1_BACK_BUTTON    23
+#define P1_ATTACK_BUTTON  16
 
 
 
 // =====================================================
-// RAMPS Y AXIS - PLAYER
+// PLAYER 2 BUTTONS
+// =====================================================
+
+#define P2_FORWARD_BUTTON 25
+#define P2_BACK_BUTTON    27
+#define P2_ATTACK_BUTTON  29
+
+
+
+// =====================================================
+// POTENTIOMETERS
+// =====================================================
+
+#define PLAYER1_POT A3
+#define PLAYER2_POT A4
+
+
+
+// =====================================================
+// PLAYER 1 Y AXIS
 // =====================================================
 
 #define Y_STEP_PIN    60
@@ -30,7 +41,7 @@
 #define Y_ENABLE_PIN  56
 
 
-AccelStepper yStepper(
+AccelStepper player1Stepper(
     AccelStepper::DRIVER,
     Y_STEP_PIN,
     Y_DIR_PIN
@@ -39,14 +50,15 @@ AccelStepper yStepper(
 
 
 // =====================================================
-// RAMPS X AXIS - ENEMY
+// PLAYER 2 X AXIS
 // =====================================================
 
-#define X_STEP_PIN    54
-#define X_DIR_PIN     55
+#define X_STEP_PIN    46
+#define X_DIR_PIN     48
+#define X_ENABLE_PIN  62
 
 
-AccelStepper xStepper(
+AccelStepper player2Stepper(
     AccelStepper::DRIVER,
     X_STEP_PIN,
     X_DIR_PIN
@@ -58,17 +70,23 @@ AccelStepper xStepper(
 // SERVOS
 // =====================================================
 
-#define WAIST_SERVO_PIN 45
-#define SWORD_SERVO_PIN 47
+#define P1_WAIST_SERVO 45
+#define P1_SWORD_SERVO 47
+
+#define P2_WAIST_SERVO 41
+#define P2_SWORD_SERVO 43
 
 
-Servo waist;
-Servo sword;
+Servo p1Waist;
+Servo p1Sword;
+
+Servo p2Waist;
+Servo p2Sword;
 
 
 
 // =====================================================
-// Y SETTINGS - PLAYER
+// POSITION SETTINGS
 // =====================================================
 
 long minPosition = 0;
@@ -79,32 +97,30 @@ const long POSITION_DEADBAND = 10;
 
 
 // =====================================================
-// X SETTINGS - ENEMY
+// ACTION STATES
 // =====================================================
 
-long enemyMinPosition = 0;
-long enemyMaxPosition = 5000;
+// PLAYER 1
 
-bool enemyMovingForward = true;
+bool p1Attacking = false;
+unsigned long p1AttackTimer = 0;
+
+bool p1Leaning = false;
+unsigned long p1LeanTimer = 0;
 
 
 
-// =====================================================
-// ACTION STATE
-// =====================================================
+// PLAYER 2
 
-bool attacking = false;
+bool p2Attacking = false;
+unsigned long p2AttackTimer = 0;
 
-unsigned long attackTimer = 0;
+bool p2Leaning = false;
+unsigned long p2LeanTimer = 0;
+
+
 
 const unsigned long attackTime = 500;
-
-
-
-bool leaning = false;
-
-unsigned long leanTimer = 0;
-
 const unsigned long leanTime = 300;
 
 
@@ -113,17 +129,21 @@ const unsigned long leanTime = 300;
 // FUNCTION PROTOTYPES
 // =====================================================
 
-void readMovement();
+void readPlayer1Movement();
+void readPlayer2Movement();
 
-void leanForward();
-void leanBack();
-void attack();
+void player1Actions();
+void player2Actions();
 
 void updateActions();
 
-void homeEnemy();
+void p1LeanForward();
+void p1LeanBack();
+void p1Attack();
 
-void updateEnemyMovement();
+void p2LeanForward();
+void p2LeanBack();
+void p2Attack();
 
 
 
@@ -137,41 +157,66 @@ void setup()
     Serial.begin(115200);
 
 
-    pinMode(FORWARD_BUTTON, INPUT_PULLUP);
-    pinMode(BACK_BUTTON, INPUT_PULLUP);
-    pinMode(ATTACK_BUTTON, INPUT_PULLUP);
+    Serial.println();
+    Serial.println("--------------------------------");
+    Serial.println(" TWO PLAYER FIGHT CONTROLLER ");
+    Serial.println("--------------------------------");
+    Serial.println("P1: Y Axis | Waist 45 | Sword 47");
+    Serial.println("P2: X Axis | Waist 41 | Sword 43");
+    Serial.println("--------------------------------");
 
 
 
-    pinMode(Y_ENABLE_PIN, OUTPUT);
-    digitalWrite(Y_ENABLE_PIN, LOW);
+    pinMode(P1_FORWARD_BUTTON, INPUT_PULLUP);
+    pinMode(P1_BACK_BUTTON, INPUT_PULLUP);
+    pinMode(P1_ATTACK_BUTTON, INPUT_PULLUP);
+
+
+    pinMode(P2_FORWARD_BUTTON, INPUT_PULLUP);
+    pinMode(P2_BACK_BUTTON, INPUT_PULLUP);
+    pinMode(P2_ATTACK_BUTTON, INPUT_PULLUP);
 
 
 
-    yStepper.setMaxSpeed(5000);
-    yStepper.setAcceleration(5000);
+  pinMode(Y_ENABLE_PIN, OUTPUT);
+  pinMode(X_ENABLE_PIN, OUTPUT);
+
+  digitalWrite(Y_ENABLE_PIN, LOW);
+  digitalWrite(X_ENABLE_PIN, LOW);
 
 
 
-    xStepper.setMaxSpeed(5000);
-    xStepper.setAcceleration(5000);
+    player1Stepper.setMaxSpeed(5000);
+    player1Stepper.setAcceleration(5000);
+
+
+    player2Stepper.setMaxSpeed(5000);
+    player2Stepper.setAcceleration(5000);
 
 
 
-    waist.attach(WAIST_SERVO_PIN);
-    sword.attach(SWORD_SERVO_PIN);
+    p1Waist.attach(P1_WAIST_SERVO);
+    p1Sword.attach(P1_SWORD_SERVO);
 
-
-    waist.write(90);
-    sword.write(0);
-
-
-
-    homeEnemy();
+    p2Waist.attach(P2_WAIST_SERVO);
+    p2Sword.attach(P2_SWORD_SERVO);
 
 
 
-    Serial.println("Controller ready");
+    p1Waist.write(90);
+    p1Sword.write(0);
+
+    p2Waist.write(90);
+    p2Sword.write(0);
+
+
+
+    player1Stepper.setCurrentPosition(0);
+    player2Stepper.setCurrentPosition(0);
+
+
+
+    Serial.println("System Ready");
 
 }
 
@@ -184,63 +229,45 @@ void setup()
 void loop()
 {
 
-    // motors must run constantly
+    player1Stepper.run();
 
-    yStepper.run();
-
-    xStepper.run();
+    player2Stepper.run();
 
 
 
-    readMovement();
+    readPlayer1Movement();
+
+    readPlayer2Movement();
 
 
-    updateEnemyMovement();
+
+    player1Actions();
+
+    player2Actions();
+
 
 
     updateActions();
-
-
-
-    if(digitalRead(BACK_BUTTON) == LOW)
-    {
-        leanForward();
-    }
-
-
-
-    if(digitalRead(FORWARD_BUTTON) == LOW)
-    {
-        leanBack();
-    }
-
-
-
-    if(digitalRead(ATTACK_BUTTON) == LOW)
-    {
-        attack();
-    }
 
 }
 
 
 
 // =====================================================
-// PLAYER POT -> Y STEPPER
+// PLAYER MOVEMENT
 // =====================================================
 
-void readMovement()
+void readPlayer1Movement()
 {
 
     static long lastTarget = -99999;
 
 
-    int potValue = analogRead(PLAYER_POT);
-
+    int value = analogRead(PLAYER1_POT);
 
 
     long target = map(
-        potValue,
+        value,
         0,
         1023,
         maxPosition,
@@ -248,11 +275,53 @@ void readMovement()
     );
 
 
+    if(abs(target - lastTarget) > POSITION_DEADBAND)
+    {
+
+        Serial.print("P1 Position: ");
+        Serial.print(target);
+        Serial.print("  Pot: ");
+        Serial.println(value);
+
+
+        player1Stepper.moveTo(target);
+
+        lastTarget = target;
+
+    }
+
+}
+
+
+
+void readPlayer2Movement()
+{
+
+    static long lastTarget = -99999;
+
+
+    int value = analogRead(PLAYER2_POT);
+
+
+    long target = map(
+        value,
+        0,
+        1023,
+        maxPosition,
+        minPosition
+    );
+
 
     if(abs(target - lastTarget) > POSITION_DEADBAND)
     {
 
-        yStepper.moveTo(target);
+        Serial.print("P2 Position: ");
+        Serial.print(target);
+        Serial.print("  Pot: ");
+        Serial.println(value);
+
+
+        player2Stepper.moveTo(target);
 
         lastTarget = target;
 
@@ -263,171 +332,228 @@ void readMovement()
 
 
 // =====================================================
-// ENEMY HOME
+// BUTTON INPUTS
 // =====================================================
 
-void homeEnemy()
+void player1Actions()
 {
 
-    Serial.println("Homing enemy");
+    if(digitalRead(P1_FORWARD_BUTTON) == LOW)
+        p1LeanForward();
 
 
-    xStepper.setCurrentPosition(0);
-
-    xStepper.moveTo(0);
-
+    if(digitalRead(P1_BACK_BUTTON) == LOW)
+        p1LeanBack();
 
 
-    while(xStepper.distanceToGo() != 0)
-    {
-        xStepper.run();
-    }
+    if(digitalRead(P1_ATTACK_BUTTON) == LOW)
+        p1Attack();
+
+}
 
 
 
-    Serial.println("Enemy ready");
+void player2Actions()
+{
+
+    if(digitalRead(P2_FORWARD_BUTTON) == LOW)
+        p2LeanForward();
+
+
+    if(digitalRead(P2_BACK_BUTTON) == LOW)
+        p2LeanBack();
+
+
+    if(digitalRead(P2_ATTACK_BUTTON) == LOW)
+        p2Attack();
 
 }
 
 
 
 // =====================================================
-// ENEMY WALKING
+// PLAYER 1 ACTIONS
 // =====================================================
 
-void updateEnemyMovement()
+void p1LeanForward()
 {
 
-    // wait until enemy reaches destination
-
-    if(xStepper.distanceToGo() != 0)
+    if(p1Leaning)
         return;
 
 
-
-    if(enemyMovingForward)
-    {
-        xStepper.moveTo(enemyMaxPosition);
-    }
-    else
-    {
-        xStepper.moveTo(enemyMinPosition);
-    }
+    Serial.println("P1 Forward Lean");
 
 
+    p1Waist.write(20);
 
-    enemyMovingForward = !enemyMovingForward;
+    p1LeanTimer = millis();
+
+    p1Leaning = true;
+
+}
+
+
+
+void p1LeanBack()
+{
+
+    if(p1Leaning)
+        return;
+
+
+    Serial.println("P1 Back Lean");
+
+
+    p1Waist.write(160);
+
+    p1LeanTimer = millis();
+
+    p1Leaning = true;
+
+}
+
+
+
+void p1Attack()
+{
+
+    if(p1Attacking)
+        return;
+
+
+    Serial.println("P1 Attack");
+
+
+    p1Sword.write(95);
+
+    p1AttackTimer = millis();
+
+    p1Attacking = true;
 
 }
 
 
 
 // =====================================================
-// UPDATE NON-BLOCKING ACTIONS
+// PLAYER 2 ACTIONS
+// =====================================================
+
+void p2LeanForward()
+{
+
+    if(p2Leaning)
+        return;
+
+
+    Serial.println("P2 Forward Lean");
+
+
+    p2Waist.write(20);
+
+    p2LeanTimer = millis();
+
+    p2Leaning = true;
+
+}
+
+
+
+void p2LeanBack()
+{
+
+    if(p2Leaning)
+        return;
+
+
+    Serial.println("P2 Back Lean");
+
+
+    p2Waist.write(160);
+
+    p2LeanTimer = millis();
+
+    p2Leaning = true;
+
+}
+
+
+
+void p2Attack()
+{
+
+    if(p2Attacking)
+        return;
+
+
+    Serial.println("P2 Attack");
+
+
+    p2Sword.write(95);
+
+    p2AttackTimer = millis();
+
+    p2Attacking = true;
+
+}
+
+
+
+// =====================================================
+// TIMER UPDATE
 // =====================================================
 
 void updateActions()
 {
 
-    if(attacking)
+    if(p1Attacking && millis() - p1AttackTimer >= attackTime)
     {
 
-        if(millis() - attackTimer >= attackTime)
-        {
+        p1Sword.write(0);
 
-            sword.write(0);
+        Serial.println("P1 Sword Reset");
 
-            attacking = false;
-
-        }
+        p1Attacking = false;
 
     }
 
 
 
-    if(leaning)
+    if(p2Attacking && millis() - p2AttackTimer >= attackTime)
     {
 
-        if(millis() - leanTimer >= leanTime)
-        {
+        p2Sword.write(0);
 
-            waist.write(90);
+        Serial.println("P2 Sword Reset");
 
-            leaning = false;
-
-        }
+        p2Attacking = false;
 
     }
 
-}
+
+
+    if(p1Leaning && millis() - p1LeanTimer >= leanTime)
+    {
+
+        p1Waist.write(90);
+
+        Serial.println("P1 Waist Reset");
+
+        p1Leaning = false;
+
+    }
 
 
 
-// =====================================================
-// WAIST
-// =====================================================
+    if(p2Leaning && millis() - p2LeanTimer >= leanTime)
+    {
 
-void leanForward()
-{
+        p2Waist.write(90);
 
-    if(leaning)
-        return;
+        Serial.println("P2 Waist Reset");
 
+        p2Leaning = false;
 
-    Serial.println("Forward lean");
-
-
-    waist.write(20);
-
-
-    leanTimer = millis();
-
-    leaning = true;
-
-}
-
-
-
-void leanBack()
-{
-
-    if(leaning)
-        return;
-
-
-    Serial.println("Back lean");
-
-
-    waist.write(160);
-
-
-    leanTimer = millis();
-
-    leaning = true;
-
-}
-
-
-
-// =====================================================
-// ATTACK
-// =====================================================
-
-void attack()
-{
-
-    if(attacking)
-        return;
-
-
-    Serial.println("Attack");
-
-
-    sword.write(70);
-
-
-    attackTimer = millis();
-
-    attacking = true;
+    }
 
 }
